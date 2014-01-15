@@ -25,6 +25,14 @@ type TProcessor interface {
 	Process(in, out TProtocol) (bool, TException)
 }
 
+type TRouter interface {
+	Receive(request Request) (bool, TException)
+}
+
 type TProcessorFunction interface {
-	Process(seqId int32, in, out TProtocol) (bool, TException)
+	Process(request Request) (bool, TException)
+}
+
+type THandler interface {
+	Log(request Request, args ...interface{})
 }
