@@ -1473,6 +1473,9 @@ void t_go_generator::generate_service_interface(t_service* tservice)
     generate_go_docstring(f_service_, tservice);
     vector<t_function*> functions = tservice->get_functions();
 
+    if (tservice->get_extends() == NULL) {
+        f_service_ << "Log(request thrift.Request, args ...interface{})" << endl;
+    }
     if (!functions.empty()) {
         f_service_ << endl;
         vector<t_function*>::iterator f_iter;
@@ -2236,11 +2239,13 @@ void t_go_generator::generate_service_server(t_service* tservice)
         f_service_ <<
                    indent() << "return " << self << endl <<
                    indent() << "}" << endl << endl <<
-                   indent() << "func (p *" << serviceName << "Processor) Process(iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {" << endl <<
-                   indent() << "  name, _, seqId, err := iprot.ReadMessageBegin()" << endl <<
-                   indent() << "  if err != nil { return false, err }" << endl <<
+                   indent() << "func (p *" << serviceName << "Processor) Receive(request thrift.Request) (success bool, err thrift.TException) {" << endl <<
+                   indent() << "  name := request.Name()" << endl <<
+                   indent() << "  seqId := request.SeqId()" << endl <<
+                   indent() << "  iprot := request.In()" << endl <<
+                   indent() << "  oprot := request.Out()" << endl <<
                    indent() << "  if processor, ok := p.GetProcessorFunction(name); ok {" << endl <<
-                   indent() << "    return processor.Process(seqId, iprot, oprot)" << endl <<
+                   indent() << "    return processor.Process(request)" << endl <<
                    indent() << "  }" << endl <<
                    indent() << "  iprot.Skip(thrift.STRUCT)" << endl <<
                    indent() << "  iprot.ReadMessageEnd()" << endl <<
@@ -2298,9 +2303,12 @@ void t_go_generator::generate_process_function(t_service* tservice,
                indent() << "type " << processorName << " struct {" << endl <<
                indent() << "  handler " << publicize(tservice->get_name()) << endl <<
                indent() << "}" << endl << endl <<
-               indent() << "func (p *" << processorName << ") Process(seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {" << endl;
+               indent() << "func (p *" << processorName << ") Process(request thrift.Request) (success bool, err thrift.TException) {" << endl;
     indent_up();
     f_service_ <<
+               indent() << "seqId := request.SeqId()" << endl <<
+               indent() << "iprot := request.In()" << endl <<
+               indent() << "oprot := request.Out()" << endl <<
                indent() << "args := New" << argsname << "()" << endl <<
                indent() << "if err = args.Read(iprot); err != nil {" << endl <<
                indent() << "  iprot.ReadMessageEnd()" << endl <<
@@ -2312,6 +2320,7 @@ void t_go_generator::generate_process_function(t_service* tservice,
                indent() << "  return" << endl <<
                indent() << "}" << endl <<
                indent() << "iprot.ReadMessageEnd()" << endl <<
+               indent() << "p.handler.Log(request, args)" << endl <<
                indent() << "result := New" << resultname << "()" << endl <<
                indent() << "if ";
 
