@@ -2320,7 +2320,16 @@ void t_go_generator::generate_process_function(t_service* tservice,
                indent() << "  return" << endl <<
                indent() << "}" << endl <<
                indent() << "iprot.ReadMessageEnd()" << endl <<
-               indent() << "p.handler.Log(request, args)" << endl <<
+               indent() << "p.handler.Log(request";
+
+    {
+        const vector<t_field*>& fields = tfunction->get_arglist()->get_members();
+        for (auto f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+            f_service_ << ", args." << publicize(variable_name_to_go_name((*f_iter)->get_name()));
+        }
+    }
+    
+    f_service_ << ")" << endl <<
                indent() << "result := New" << resultname << "()" << endl <<
                indent() << "if ";
 
@@ -2329,11 +2338,8 @@ void t_go_generator::generate_process_function(t_service* tservice,
             f_service_ << "result.Success, ";
         }
 
-        t_struct* exceptions = tfunction->get_xceptions();
-        const vector<t_field*>& fields = exceptions->get_members();
-        vector<t_field*>::const_iterator f_iter;
-
-        for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+        const vector<t_field*>& fields = tfunction->get_xceptions()->get_members();
+        for (auto f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
             f_service_ << "result." << publicize(variable_name_to_go_name((*f_iter)->get_name())) << ", ";
         }
     }

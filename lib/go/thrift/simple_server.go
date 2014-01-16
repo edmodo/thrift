@@ -117,6 +117,7 @@ func (p *TSimpleServer) Serve() error {
 	if err != nil {
 		return err
 	}
+	id := int64(1)
 	for !p.stopped {
 		client, err := p.serverTransport.Accept()
 		if err != nil {
@@ -124,10 +125,11 @@ func (p *TSimpleServer) Serve() error {
 		}
 		if client != nil {
 			go func() {
-				if err := p.processRequest(client); err != nil {
+				if err := p.processRequest(id, client); err != nil {
 					log.Println("error processing request:", err)
 				}
 			}()
+			id++
 		}
 	}
 	return nil
@@ -139,7 +141,7 @@ func (p *TSimpleServer) Stop() error {
 	return nil
 }
 
-func (p *TSimpleServer) processRequest(client TTransport) error {
+func (p *TSimpleServer) processRequest(id int64, client TTransport) error {
 	processor := p.processorFactory.GetProcessor(client)
 	inputTransport := p.inputTransportFactory.GetTransport(client)
 	outputTransport := p.outputTransportFactory.GetTransport(client)
@@ -152,7 +154,7 @@ func (p *TSimpleServer) processRequest(client TTransport) error {
 		defer outputTransport.Close()
 	}
 	for {
-		ok, err := processor.Process(inputProtocol, outputProtocol)
+		ok, err := processor.Process(id, inputProtocol, outputProtocol)
 		if err, ok := err.(TTransportException); ok && err.TypeId() == END_OF_FILE{
 			return nil
 		} else if err != nil {
