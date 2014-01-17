@@ -33,6 +33,7 @@ type TProcessorFunction interface {
 	Process(request Request) (bool, TException)
 }
 
-type THandler interface {
-	Log(request Request, args ...interface{})
+type THandlerListener interface {
+	PreHandle(request Request, args ...interface{})
+	PostHandle(request Request, args ...interface{})
 }
