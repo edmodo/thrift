@@ -2212,6 +2212,7 @@ void t_go_generator::generate_service_server(t_service* tservice)
                    indent() << "type " << serviceName << "Processor struct {" << endl <<
                    indent() << "  processorMap map[string]thrift.TProcessorFunction" << endl <<
                    indent() << "  handler " << serviceName << endl <<
+                   indent() << "  listener thrift.THandlerListener" << endl <<
                    indent() << "}" << endl << endl <<
                    indent() << "func (p *" << serviceName << "Processor) AddToProcessorMap(key string, processor thrift.TProcessorFunction) {" << endl <<
                    indent() << "  p.processorMap[key] = processor" << endl <<
@@ -2223,24 +2224,26 @@ void t_go_generator::generate_service_server(t_service* tservice)
                    indent() << "func (p *" << serviceName << "Processor) ProcessorMap() map[string]thrift.TProcessorFunction {" << endl <<
                    indent() << "  return p.processorMap" << endl <<
                    indent() << "}" << endl << endl <<
-                   indent() << "func New" << serviceName << "Processor(handler " << serviceName << ") *" << serviceName << "Processor {" << endl << endl <<
-                   indent() << "  " << self << " := &" << serviceName << "Processor{handler:handler, processorMap:make(map[string]thrift.TProcessorFunction)}" << endl;
+                   indent() << "func New" << serviceName << "Processor(handler " << serviceName << ", listener thrift.THandlerListener) *" << serviceName << "Processor {" << endl <<
+                   indent() << "  " << self << " := &" << serviceName << "Processor{handler:handler, listener:listener, processorMap:make(map[string]thrift.TProcessorFunction)}" << endl;
 
         for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
             string escapedFuncName(escape_string((*f_iter)->get_name()));
             f_service_ <<
-                       indent() << "  " << self << ".processorMap[\"" << escapedFuncName << "\"] = &" << pServiceName << "Processor" << publicize((*f_iter)->get_name()) << "{handler:handler}" << endl;
+                       indent() << "  " << self << ".processorMap[\"" << escapedFuncName << "\"] = &" << pServiceName << "Processor" << publicize((*f_iter)->get_name()) << "{handler:handler, listener:listener}" << endl;
         }
 
         string x(tmp("x"));
         f_service_ <<
                    indent() << "return " << self << endl <<
                    indent() << "}" << endl << endl <<
-                   indent() << "func (p *" << serviceName << "Processor) Process(iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {" << endl <<
-                   indent() << "  name, _, seqId, err := iprot.ReadMessageBegin()" << endl <<
-                   indent() << "  if err != nil { return false, err }" << endl <<
+                   indent() << "func (p *" << serviceName << "Processor) Receive(request thrift.Request) (success bool, err thrift.TException) {" << endl <<
+                   indent() << "  name := request.Name()" << endl <<
+                   indent() << "  seqId := request.SeqId()" << endl <<
+                   indent() << "  iprot := request.In()" << endl <<
+                   indent() << "  oprot := request.Out()" << endl <<
                    indent() << "  if processor, ok := p.GetProcessorFunction(name); ok {" << endl <<
-                   indent() << "    return processor.Process(seqId, iprot, oprot)" << endl <<
+                   indent() << "    return processor.Process(request)" << endl <<
                    indent() << "  }" << endl <<
                    indent() << "  iprot.Skip(thrift.STRUCT)" << endl <<
                    indent() << "  iprot.ReadMessageEnd()" << endl <<
@@ -2257,13 +2260,13 @@ void t_go_generator::generate_service_server(t_service* tservice)
                    indent() << "type " << serviceName << "Processor struct {" << endl <<
                    indent() << "  *" << extends_processor << endl <<
                    indent() << "}" << endl << endl <<
-                   indent() << "func New" << serviceName << "Processor(handler " << serviceName << ") *" << serviceName << "Processor {" << endl <<
-                   indent() << "  " << self << " := &" << serviceName << "Processor{" << extends_processor_new << "(handler)}" << endl;
+                   indent() << "func New" << serviceName << "Processor(handler " << serviceName << ", listener thrift.THandlerListener) *" << serviceName << "Processor {" << endl <<
+                   indent() << "  " << self << " := &" << serviceName << "Processor{" << extends_processor_new << "(handler, listener)}" << endl;
 
         for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
             string escapedFuncName(escape_string((*f_iter)->get_name()));
             f_service_ <<
-                       indent() << "  " << self << ".AddToProcessorMap(\"" << escapedFuncName << "\", &" << pServiceName << "Processor" << publicize((*f_iter)->get_name()) << "{handler:handler})" << endl;
+                       indent() << "  " << self << ".AddToProcessorMap(\"" << escapedFuncName << "\", &" << pServiceName << "Processor" << publicize((*f_iter)->get_name()) << "{handler:handler, listener:listener})" << endl;
         }
 
         f_service_ <<
@@ -2297,10 +2300,14 @@ void t_go_generator::generate_process_function(t_service* tservice,
     f_service_ <<
                indent() << "type " << processorName << " struct {" << endl <<
                indent() << "  handler " << publicize(tservice->get_name()) << endl <<
+               indent() << "  listener thrift.THandlerListener" << endl <<
                indent() << "}" << endl << endl <<
-               indent() << "func (p *" << processorName << ") Process(seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {" << endl;
+               indent() << "func (p *" << processorName << ") Process(request thrift.Request) (success bool, err thrift.TException) {" << endl;
     indent_up();
     f_service_ <<
+               indent() << "seqId := request.SeqId()" << endl <<
+               indent() << "iprot := request.In()" << endl <<
+               indent() << "oprot := request.Out()" << endl <<
                indent() << "args := New" << argsname << "()" << endl <<
                indent() << "if err = args.Read(iprot); err != nil {" << endl <<
                indent() << "  iprot.ReadMessageEnd()" << endl <<
@@ -2312,20 +2319,32 @@ void t_go_generator::generate_process_function(t_service* tservice,
                indent() << "  return" << endl <<
                indent() << "}" << endl <<
                indent() << "iprot.ReadMessageEnd()" << endl <<
-               indent() << "result := New" << resultname << "()" << endl <<
-               indent() << "if ";
+               indent() << "if p.listener != nil {" << endl <<
+               indent() << "  p.listener.PreHandle(request";
+
+    {
+        const vector<t_field*>& fields = tfunction->get_arglist()->get_members();
+        for (auto f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+            f_service_ << ", args." << publicize(variable_name_to_go_name((*f_iter)->get_name()));
+        }
+    }
+    
+    f_service_ << ")" << endl <<
+               indent() << "}" << endl <<
+               indent() << "result := New" << resultname << "()" << endl;
+
+    std::string result_args;
 
     if (!tfunction->is_oneway()) {
         if (!tfunction->get_returntype()->is_void()) {
-            f_service_ << "result.Success, ";
+            result_args += "result.Success, ";
         }
 
-        t_struct* exceptions = tfunction->get_xceptions();
-        const vector<t_field*>& fields = exceptions->get_members();
-        vector<t_field*>::const_iterator f_iter;
-
-        for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
-            f_service_ << "result." << publicize(variable_name_to_go_name((*f_iter)->get_name())) << ", ";
+        const vector<t_field*>& fields = tfunction->get_xceptions()->get_members();
+        for (auto f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+            result_args += "result.";
+            result_args += publicize(variable_name_to_go_name((*f_iter)->get_name()));
+            result_args += ", ";
         }
     }
 
@@ -2333,7 +2352,7 @@ void t_go_generator::generate_process_function(t_service* tservice,
     t_struct* arg_struct = tfunction->get_arglist();
     const std::vector<t_field*>& fields = arg_struct->get_members();
     vector<t_field*>::const_iterator f_iter;
-    f_service_ <<
+    f_service_ << indent() << result_args <<
                "err = p.handler." << publicize(tfunction->get_name()) << "(";
     bool first = true;
 
@@ -2346,8 +2365,12 @@ void t_go_generator::generate_process_function(t_service* tservice,
 
         f_service_ << "args." << publicize(variable_name_to_go_name((*f_iter)->get_name()));
     }
-
-    f_service_ << "); err != nil {" << endl <<
+    f_service_ << ")" << endl <<
+               indent() << "if p.listener != nil {" << endl <<
+               indent() << "  p.listener.PostHandle(request, " << result_args << "err)" << endl <<
+               indent() << "  defer p.listener.Completed(request, err)" << endl <<
+               indent() << "}" << endl <<
+               indent() << "if err != nil {" << endl <<
                indent() << "  x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, \"Internal error processing " << escape_string(tfunction->get_name()) << ": \" + err.Error())" << endl <<
                indent() << "  oprot.WriteMessageBegin(\"" << escape_string(tfunction->get_name()) << "\", thrift.EXCEPTION, seqId)" << endl <<
                indent() << "  x.Write(oprot)" << endl <<
