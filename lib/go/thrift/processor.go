@@ -36,4 +36,5 @@ type TProcessorFunction interface {
 type THandlerListener interface {
 	PreHandle(request Request, args ...interface{})
 	PostHandle(request Request, args ...interface{})
+	Completed(request Request, err error)
 }

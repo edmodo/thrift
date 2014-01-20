@@ -2368,6 +2368,7 @@ void t_go_generator::generate_process_function(t_service* tservice,
     f_service_ << ")" << endl <<
                indent() << "if p.listener != nil {" << endl <<
                indent() << "  p.listener.PostHandle(request, " << result_args << "err)" << endl <<
+               indent() << "  defer p.listener.Completed(request, err)" << endl <<
                indent() << "}" << endl <<
                indent() << "if err != nil {" << endl <<
                indent() << "  x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, \"Internal error processing " << escape_string(tfunction->get_name()) << ": \" + err.Error())" << endl <<
