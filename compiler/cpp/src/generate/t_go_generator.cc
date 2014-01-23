@@ -2324,7 +2324,7 @@ void t_go_generator::generate_process_function(t_service* tservice,
 
     {
         const vector<t_field*>& fields = tfunction->get_arglist()->get_members();
-        for (auto f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+        for (vector<t_field*>::const_iterator f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
             f_service_ << ", args." << publicize(variable_name_to_go_name((*f_iter)->get_name()));
         }
     }
@@ -2341,7 +2341,7 @@ void t_go_generator::generate_process_function(t_service* tservice,
         }
 
         const vector<t_field*>& fields = tfunction->get_xceptions()->get_members();
-        for (auto f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+        for (vector<t_field*>::const_iterator f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
             result_args += "result.";
             result_args += publicize(variable_name_to_go_name((*f_iter)->get_name()));
             result_args += ", ";
