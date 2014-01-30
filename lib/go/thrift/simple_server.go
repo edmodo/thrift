@@ -124,11 +124,11 @@ func (p *TSimpleServer) Serve() error {
 			log.Println("Accept err: ", err)
 		}
 		if client != nil {
-			go func() {
+			go func(id int64) {
 				if err := p.processRequest(id, client); err != nil {
 					log.Println("error processing request:", err)
 				}
-			}()
+			}(id)
 			id++
 		}
 	}
