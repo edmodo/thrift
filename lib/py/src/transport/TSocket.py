@@ -92,9 +92,9 @@ class TSocket(TSocketBase):
         break
     except socket.error, e:
       if self._unix_socket:
-        message = 'Could not connect to socket %s' % self._unix_socket
+        message = 'Could not connect to socket {0}'.format(self._unix_socket)
       else:
-        message = 'Could not connect to %s:%d' % (self.host, self.port)
+        message = 'Could not connect to {0}:{1}: {2}'.format(self.host, self.port, e)
       raise TTransportException(type=TTransportException.NOT_OPEN,
                                 message=message)
 
