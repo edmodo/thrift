@@ -61,6 +61,12 @@ class t_py_generator : public t_generator {
     iter = parsed_options.find("slots");
     gen_slots_ = (iter != parsed_options.end());
 
+    iter = parsed_options.find("package");
+    if (iter != parsed_options.end()) {
+      package_name_ = (iter->second);
+      package_prefix_ = package_name_ + ".";
+    }
+
     iter = parsed_options.find("dynamic");
     gen_dynamic_ = (iter != parsed_options.end());
 
@@ -279,10 +285,16 @@ class t_py_generator : public t_generator {
    */
   bool gen_newstyle_;
 
-   /**
+  /**
    * True if we should generate dynamic style classes.
    */
   bool gen_dynamic_;
+
+  /**
+   * Optional package to use when importing services.
+   */
+  std::string package_name_;
+  std::string package_prefix_;
 
   bool gen_dynbase_;
   std::string gen_dynbaseclass_;
@@ -333,6 +345,10 @@ void t_py_generator::init_generator() {
   // Make output directory
   string module = get_real_py_module(program_, gen_twisted_);
   package_dir_ = get_out_dir();
+  if (package_name_.size()) {
+    MKDIR(package_dir_.c_str());
+    package_dir_ += "/" + package_name_;
+  }
   module_ = module;
   while (true) {
     // TODO: Do better error checking here.
@@ -396,7 +412,21 @@ string t_py_generator::render_includes() {
   const vector<t_program*>& includes = program_->get_includes();
   string result = "";
   for (size_t i = 0; i < includes.size(); ++i) {
-    result += "import " + get_real_py_module(includes[i], gen_twisted_) + ".ttypes\n";
+    if (package_name_.size()) {
+      // Note: two imports are needed here, since without a package, we get:
+      //     "import service.ttypes"
+      //
+      // Which adds "service" to the gloal scope and imports ttypes, and thrift
+      // expects both things to happen.
+      //
+      // from package import service
+      // from package.service import ttypes
+      result += "from " + package_name_ + " import " + get_real_py_module(includes[i], gen_twisted_) + "\n";
+      result += "from " + package_prefix_ + get_real_py_module(includes[i], gen_twisted_) + " import ttypes\n";
+    } else {
+      // import service.ttypes
+      result += "import " + get_real_py_module(includes[i], gen_twisted_) + ".ttypes\n";
+    }
   }
   if (includes.size() > 0) {
     result += "\n";
@@ -1041,7 +1071,7 @@ void t_py_generator::generate_service(t_service* tservice) {
 
   if (tservice->get_extends() != NULL) {
     f_service_ <<
-      "import " << get_real_py_module(tservice->get_extends()->get_program(), gen_twisted_) <<
+      "import " << package_prefix_ << get_real_py_module(tservice->get_extends()->get_program(), gen_twisted_) <<
       "." << tservice->get_extends()->get_name() << endl;
   }
 
@@ -1562,8 +1592,8 @@ void t_py_generator::generate_service_remote(t_service* tservice) {
     endl;
 
   f_remote <<
-    "from " << module_ << " import " << service_name_ << endl <<
-    "from " << module_ << ".ttypes import *" << endl <<
+    "from " << package_prefix_ << module_ << " import " << service_name_ << endl <<
+    "from " << package_prefix_ << module_ << ".ttypes import *" << endl <<
     endl;
 
   f_remote <<
@@ -2771,6 +2801,7 @@ THRIFT_REGISTER_GENERATOR(py, "Python",
 "    utf8strings:     Encode/decode strings using utf8 in the generated code.\n" \
 "    slots:           Generate code using slots for instance members.\n" \
 "    dynamic:         Generate dynamic code, less code generated but slower.\n" \
+"    package=PACKAGE  Import services from within the named package.\n" \
 "    dynbase=CLS      Derive generated classes from class CLS instead of TBase.\n" \
 "    dynexc=CLS       Derive generated exceptions from CLS instead of TExceptionBase.\n" \
 "    dynimport='from foo.bar import CLS'\n" \
