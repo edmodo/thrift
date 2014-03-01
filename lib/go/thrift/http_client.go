@@ -139,3 +139,7 @@ func (p *THttpClient) Flush() error {
 	p.response = response
 	return nil
 }
+
+func (p *THttpClient) RemoteAddr() string {
+	return p.url.String()
+}

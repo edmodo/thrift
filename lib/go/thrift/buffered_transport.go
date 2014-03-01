@@ -104,3 +104,7 @@ func (p *TBufferedTransport) Flush() error {
 func (p *TBufferedTransport) Peek() bool {
 	return p.rbuf.pos < p.rbuf.limit || p.tp.Peek()
 }
+
+func (p *TBufferedTransport) RemoteAddr() string {
+	return p.tp.RemoteAddr()
+}

@@ -157,3 +157,7 @@ func (p *TSocket) Interrupt() error {
 	}
 	return p.conn.Close()
 }
+
+func (p *TSocket) RemoteAddr() string {
+	return p.conn.RemoteAddr().String()
+}

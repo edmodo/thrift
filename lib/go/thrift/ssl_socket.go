@@ -81,6 +81,10 @@ func (p *TSSLSocket) pushDeadline(read, write bool) {
 	}
 }
 
+func (p *TSSLSocket) RemoteAddr() string {
+	return p.conn.RemoteAddr().String()
+}
+
 // Connects the socket, creating a new socket object if necessary.
 func (p *TSSLSocket) Open() error {
 	if p.IsOpen() {
