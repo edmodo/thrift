@@ -166,3 +166,7 @@ func (p *StreamTransport) Flush() error {
 	}
 	return nil
 }
+
+func (p *StreamTransport) RemoteAddr() string {
+	return "file"
+}

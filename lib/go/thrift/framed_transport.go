@@ -122,3 +122,7 @@ func (p *TFramedTransport) readFrame() (int, error) {
 	p.readBuffer = bytes.NewBuffer(buf2)
 	return size, nil
 }
+
+func (p *TFramedTransport) RemoteAddr() string {
+	return p.transport.RemoteAddr()
+}
