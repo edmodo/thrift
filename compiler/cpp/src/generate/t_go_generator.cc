@@ -1029,87 +1029,88 @@ void t_go_generator::generate_isset_helpers(ofstream& out,
     for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
         t_type* type = get_true_type((*f_iter)->get_type());
 
-        if ((*f_iter)->get_req() == t_field::T_OPTIONAL || type->is_enum()) {
-            const string field_name(publicize(variable_name_to_go_name(escape_string((*f_iter)->get_name()))));
-            t_const_value* field_default_value = (*f_iter)->get_value();
-            out <<
-                indent() << "func (p *" << tstruct_name << ") IsSet" << field_name << "() bool {" << endl;
-            indent_up();
-            string s_check_value;
-            int64_t i_check_value;
-            double d_check_value;
+        if (!((*f_iter)->get_req() == t_field::T_OPTIONAL || type->is_enum()))
+            continue;
+         
+        const string field_name(publicize(variable_name_to_go_name(escape_string((*f_iter)->get_name()))));
+        t_const_value* field_default_value = (*f_iter)->get_value();
+        out <<
+            indent() << "func (p *" << tstruct_name << ") IsSet" << field_name << "() bool {" << endl;
+        indent_up();
+        string s_check_value;
+        int64_t i_check_value;
+        double d_check_value;
 
-            if (type->is_base_type()) {
-                t_base_type::t_base tbase = ((t_base_type*)type)->get_base();
+        if (type->is_base_type()) {
+            t_base_type::t_base tbase = ((t_base_type*)type)->get_base();
 
-                switch (tbase) {
-                case t_base_type::TYPE_STRING:
-                    if (((t_base_type*)type)->is_binary()) {
-                        // ignore default value for binary
-                        out <<
-                            indent() << "return p." << field_name << " != nil" << endl;
-                    } else {
-                        s_check_value = (field_default_value == NULL) ? "\"\"" : render_const_value(type, field_default_value, tstruct_name);
-                        out <<
-                            indent() << "return p." << field_name << " != " << s_check_value << endl;
-                    }
-
-                    break;
-
-                case t_base_type::TYPE_BOOL:
-                    s_check_value = (field_default_value != NULL && field_default_value->get_integer() > 0) ? "true" : "false";
+            switch (tbase) {
+            case t_base_type::TYPE_STRING:
+                if (((t_base_type*)type)->is_binary()) {
+                    // ignore default value for binary
+                    out <<
+                        indent() << "return p." << field_name << " != nil" << endl;
+                } else {
+                    s_check_value = (field_default_value == NULL) ? "\"\"" : render_const_value(type, field_default_value, tstruct_name);
                     out <<
                         indent() << "return p." << field_name << " != " << s_check_value << endl;
-                    break;
-
-                case t_base_type::TYPE_BYTE:
-                case t_base_type::TYPE_I16:
-                case t_base_type::TYPE_I32:
-                case t_base_type::TYPE_I64:
-                    i_check_value = (field_default_value == NULL) ? 0 : field_default_value->get_integer();
-                    out <<
-                        indent() << "return p." << field_name << " != " << i_check_value << endl;
-                    break;
-
-                case t_base_type::TYPE_DOUBLE:
-                    d_check_value = (field_default_value == NULL) ? 0.0 : field_default_value->get_double();
-                    out <<
-                        indent() << "return p." << field_name << " != " << d_check_value << endl;
-                    break;
-
-                default:
-                    throw "compiler error: no const of base type " + t_base_type::t_base_name(tbase);
                 }
-            } else if (type->is_enum()) {
-                out << indent() << "return int64(p." << field_name << ") != "
-                    << "math.MinInt32 - 1" << endl;
-            } else if (type->is_struct() || type->is_xception()) {
+
+                break;
+
+            case t_base_type::TYPE_BOOL:
+                s_check_value = (field_default_value != NULL && field_default_value->get_integer() > 0) ? "true" : "false";
+                out <<
+                    indent() << "return p." << field_name << " != " << s_check_value << endl;
+                break;
+
+            case t_base_type::TYPE_BYTE:
+            case t_base_type::TYPE_I16:
+            case t_base_type::TYPE_I32:
+            case t_base_type::TYPE_I64:
+                i_check_value = (field_default_value == NULL) ? 0 : field_default_value->get_integer();
+                out <<
+                    indent() << "return p." << field_name << " != " << i_check_value << endl;
+                break;
+
+            case t_base_type::TYPE_DOUBLE:
+                d_check_value = (field_default_value == NULL) ? 0.0 : field_default_value->get_double();
+                out <<
+                    indent() << "return p." << field_name << " != " << d_check_value << endl;
+                break;
+
+            default:
+                throw "compiler error: no const of base type " + t_base_type::t_base_name(tbase);
+            }
+        } else if (type->is_enum()) {
+            out << indent() << "return int64(p." << field_name << ") != "
+                << "math.MinInt32 - 1" << endl;
+        } else if (type->is_struct() || type->is_xception()) {
+            out <<
+                indent() << "return p." << field_name << " != nil" << endl;
+        } else if (type->is_list() || type->is_set()) {
+            if (field_default_value != NULL && field_default_value->get_list().size() > 0) {
                 out <<
                     indent() << "return p." << field_name << " != nil" << endl;
-            } else if (type->is_list() || type->is_set()) {
-                if (field_default_value != NULL && field_default_value->get_list().size() > 0) {
-                    out <<
-                        indent() << "return p." << field_name << " != nil" << endl;
-                } else {
-                    out <<
-                        indent() << "return p." << field_name << " != nil && len(p." << field_name << ") > 0" << endl;
-                }
-            } else if (type->is_map()) {
-                if (field_default_value != NULL && field_default_value->get_map().size() > 0) {
-                    out <<
-                        indent() << "return p." << field_name << " != nil" << endl;
-                } else {
-                    out <<
-                        indent() << "return p." << field_name << " != nil && len(p." << field_name << ") > 0" << endl;
-                }
             } else {
-                throw "CANNOT GENERATE ISSET HELPERS FOR TYPE: " + type->get_name();
+                out <<
+                    indent() << "return p." << field_name << " != nil && len(p." << field_name << ") > 0" << endl;
             }
-
-            indent_down();
-            out <<
-                indent() << "}" << endl << endl;
+        } else if (type->is_map()) {
+            if (field_default_value != NULL && field_default_value->get_map().size() > 0) {
+                out <<
+                    indent() << "return p." << field_name << " != nil" << endl;
+            } else {
+                out <<
+                    indent() << "return p." << field_name << " != nil && len(p." << field_name << ") > 0" << endl;
+            }
+        } else {
+            throw "CANNOT GENERATE ISSET HELPERS FOR TYPE: " + type->get_name();
         }
+
+        indent_down();
+        out <<
+            indent() << "}" << endl << endl;
     }
 }
 
