@@ -137,6 +137,10 @@ class t_field : public t_doc {
 
   std::map<std::string, std::string> annotations_;
 
+  bool nullable() const {
+      return annotations_.find("nullable") != annotations_.end();
+  }
+
  private:
   t_type* type_;
   std::string name_;

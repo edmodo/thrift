@@ -217,7 +217,7 @@ public:
     std::string function_signature_if(t_function* tfunction, std::string prefix = "", bool addError = false);
     std::string argument_list(t_struct* tstruct);
     std::string type_to_enum(t_type* ttype);
-    std::string type_to_go_type(t_type* ttype);
+    std::string type_to_go_type(t_type* ttype, bool nullable = false);
     std::string type_to_go_key_type(t_type* ttype);
     std::string type_to_spec_args(t_type* ttype);
 
@@ -952,7 +952,7 @@ void t_go_generator::generate_go_struct_definition(ofstream& out,
             }
 
             t_type* fieldType = (*m_iter)->get_type();
-            string goType(type_to_go_type(fieldType));
+            string goType(type_to_go_type(fieldType, (*m_iter)->nullable()));
 
             indent(out) << publicize(variable_name_to_go_name((*m_iter)->get_name())) << " "
                         << goType << " `thrift:\""
@@ -971,7 +971,7 @@ void t_go_generator::generate_go_struct_definition(ofstream& out,
             // This fills in default values, as opposed to nulls
             out <<
                 indent() << publicize((*m_iter)->get_name()) << " " <<
-                type_to_go_type((*m_iter)->get_type()) << endl;
+                type_to_go_type((*m_iter)->get_type(), (*m_iter)->nullable()) << endl;
         }
     }
 
@@ -1041,7 +1041,9 @@ void t_go_generator::generate_isset_helpers(ofstream& out,
         int64_t i_check_value;
         double d_check_value;
 
-        if (type->is_base_type()) {
+        if (type->is_base_type() && (*f_iter)->nullable()) {
+            out << indent() << "return p." << field_name << " != nil" << endl;
+        } else if (type->is_base_type()) {
             t_base_type::t_base tbase = ((t_base_type*)type)->get_base();
 
             switch (tbase) {
@@ -2547,10 +2549,19 @@ void t_go_generator::generate_deserialize_field(ofstream &out,
             wrap = "int8";
         }
 
-        if (wrap == "") {
-            indent(out) << name << " = v" << endl;
+        if (tfield->nullable()) {
+            if (wrap == "") {
+                indent(out) << name << " = &v" << endl;
+            } else {
+                indent(out) << "wrapped := " << wrap << "(v)" << endl;
+                indent(out) << name << " = &wrapped" << endl;
+            }
         } else {
-            indent(out) << name << " = " << wrap << "(v)" << endl;
+            if (wrap == "") {
+                indent(out) << name << " = v" << endl;
+            } else {
+                indent(out) << name << " = " << wrap << "(v)" << endl;
+            }
         }
 
         out << "}" << endl;
@@ -2741,6 +2752,8 @@ void t_go_generator::generate_serialize_field(ofstream &out,
         indent(out) <<
                     "if err := oprot.";
 
+        std::string prefix = tfield->nullable() ? "*" : "";
+
         if (type->is_base_type()) {
             t_base_type::t_base tbase = ((t_base_type*)type)->get_base();
 
@@ -2752,35 +2765,35 @@ void t_go_generator::generate_serialize_field(ofstream &out,
 
             case t_base_type::TYPE_STRING:
                 if (((t_base_type*)type)->is_binary()) {
-                    out << "WriteBinary(" << name << ")";
+                    out << "WriteBinary(" << prefix << name << ")";
                 } else {
-                    out << "WriteString(string(" << name << "))";
+                    out << "WriteString(string(" << prefix << name << "))";
                 }
 
                 break;
 
             case t_base_type::TYPE_BOOL:
-                out << "WriteBool(bool(" << name << "))";
+                out << "WriteBool(bool(" << prefix << name << "))";
                 break;
 
             case t_base_type::TYPE_BYTE:
-                out << "WriteByte(byte(" << name << "))";
+                out << "WriteByte(byte(" << prefix << name << "))";
                 break;
 
             case t_base_type::TYPE_I16:
-                out << "WriteI16(int16(" << name << "))";
+                out << "WriteI16(int16(" << prefix << name << "))";
                 break;
 
             case t_base_type::TYPE_I32:
-                out << "WriteI32(int32(" << name << "))";
+                out << "WriteI32(int32(" << prefix << name << "))";
                 break;
 
             case t_base_type::TYPE_I64:
-                out << "WriteI64(int64(" << name << "))";
+                out << "WriteI64(int64(" << prefix << name << "))";
                 break;
 
             case t_base_type::TYPE_DOUBLE:
-                out << "WriteDouble(float64(" << name << "))";
+                out << "WriteDouble(float64(" << prefix << name << "))";
                 break;
 
             default:
@@ -3215,7 +3228,7 @@ string t_go_generator::type_to_go_key_type(t_type* type)
 /**
  * Converts the parse type to a go tyoe
  */
-string t_go_generator::type_to_go_type(t_type* type)
+string t_go_generator::type_to_go_type(t_type* type, bool nullable)
 {
     //type = get_true_type(type);
     if (type->is_base_type()) {
@@ -3230,24 +3243,38 @@ string t_go_generator::type_to_go_type(t_type* type)
                 return "[]byte";
             }
 
+            if (nullable)
+                return "*string";
             return "string";
 
         case t_base_type::TYPE_BOOL:
+            if (nullable)
+                return "*bool";
             return "bool";
 
         case t_base_type::TYPE_BYTE:
+            if (nullable)
+                return "*int8";
             return "int8";
 
         case t_base_type::TYPE_I16:
+            if (nullable)
+                return "*int16";
             return "int16";
 
         case t_base_type::TYPE_I32:
+            if (nullable)
+                return "*int32";
             return "int32";
 
         case t_base_type::TYPE_I64:
+            if (nullable)
+                return "*int64";
             return "int64";
 
         case t_base_type::TYPE_DOUBLE:
+            if (nullable)
+                return "*float64";
             return "float64";
         }
     } else if (type->is_enum()) {
