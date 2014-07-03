@@ -2335,6 +2335,29 @@ void t_go_generator::generate_process_function(t_service* tservice,
 
     std::string result_args;
 
+    f_service_ << indent() << "var callbackError error" << endl;
+    f_service_ << indent() << "(func() {" << endl;
+    indent_up();
+
+    f_service_ << indent() << "defer (func() {" << endl;
+    {
+        Indent _(this);
+        f_service_ << indent() << "if r := recover(); r != nil {" << endl;
+        {
+            Indent _(this);
+            f_service_ << indent() << "err, ok := r.(error)" << endl;
+            f_service_ << indent() << "if !ok {" << endl;
+            {
+                Indent _(this);
+                f_service_ << indent() << "err = fmt.Errorf(\"%v\", r)" << endl;
+            }
+            f_service_ << indent() << "}" << endl;
+            f_service_ << indent() << "callbackError = err" << endl;
+        }
+        f_service_ << indent() << "}" << endl;
+    }
+    f_service_ << indent() << "})()" << endl;
+
     if (!tfunction->is_oneway()) {
         if (!tfunction->get_returntype()->is_void()) {
             result_args += "result.Success, ";
@@ -2353,7 +2376,7 @@ void t_go_generator::generate_process_function(t_service* tservice,
     const std::vector<t_field*>& fields = arg_struct->get_members();
     vector<t_field*>::const_iterator f_iter;
     f_service_ << indent() << result_args <<
-               "err = p.handler." << publicize(tfunction->get_name()) << "(";
+               "callbackError = p.handler." << publicize(tfunction->get_name()) << "(";
     bool first = true;
 
     for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
@@ -2365,13 +2388,18 @@ void t_go_generator::generate_process_function(t_service* tservice,
 
         f_service_ << "args." << publicize(variable_name_to_go_name((*f_iter)->get_name()));
     }
-    f_service_ << ")" << endl <<
+    f_service_ << ")" << endl;
+
+    indent_down();
+    f_service_ << indent() << "})()" << endl;
+
+    f_service_ <<
                indent() << "if p.listener != nil {" << endl <<
-               indent() << "  p.listener.PostHandle(request, " << result_args << "err)" << endl <<
-               indent() << "  defer p.listener.Completed(request, err)" << endl <<
+               indent() << "  p.listener.PostHandle(request, " << result_args << "callbackError)" << endl <<
+               indent() << "  defer p.listener.Completed(request, callbackError)" << endl <<
                indent() << "}" << endl <<
-               indent() << "if err != nil {" << endl <<
-               indent() << "  x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, \"Internal error processing " << escape_string(tfunction->get_name()) << ": \" + err.Error())" << endl <<
+               indent() << "if callbackError != nil {" << endl <<
+               indent() << "  x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, \"Internal error processing " << escape_string(tfunction->get_name()) << ": \" + callbackError.Error())" << endl <<
                indent() << "  oprot.WriteMessageBegin(\"" << escape_string(tfunction->get_name()) << "\", thrift.EXCEPTION, seqId)" << endl <<
                indent() << "  x.Write(oprot)" << endl <<
                indent() << "  oprot.WriteMessageEnd()" << endl <<
