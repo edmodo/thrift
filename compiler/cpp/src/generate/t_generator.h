@@ -154,6 +154,7 @@ class t_generator {
    * Indentation level modifiers
    */
 
+ public:
   void indent_up(){
     ++indent_;
   }
@@ -162,6 +163,7 @@ class t_generator {
     --indent_;
   }
 
+ protected:
   /**
    * Indentation print function
    */
@@ -288,6 +290,22 @@ class t_generator {
    * Temporary variable counter, for making unique variable names
    */
   int tmp_;
+};
+
+class Indent
+{
+ public:
+  Indent(t_generator *gen)
+    : gen_(gen)
+  {
+    gen_->indent_up();
+  }
+  ~Indent() {
+    gen_->indent_down();
+  }
+
+ private:
+  t_generator *gen_;
 };
 
 #endif
