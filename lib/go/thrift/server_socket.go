@@ -103,5 +103,6 @@ func (p *TServerSocket) Close() error {
 
 func (p *TServerSocket) Interrupt() error {
 	p.interrupted = true
+	p.Close()
 	return nil
 }
