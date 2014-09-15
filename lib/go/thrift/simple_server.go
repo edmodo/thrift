@@ -120,7 +120,7 @@ func (p *TSimpleServer) Serve() error {
 	id := int64(1)
 	for !p.stopped {
 		client, err := p.serverTransport.Accept()
-		if err != nil {
+		if err != nil && !p.stopped {
 			log.Println("Accept err: ", err)
 		}
 		if client != nil {
