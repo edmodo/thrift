@@ -19,7 +19,7 @@
 
 AC_PREREQ(2.65)
 
-AC_INIT([thrift], [0.9.1.2-edmodo])
+AC_INIT([thrift], [0.9.2-edmodo])
 
 AC_CONFIG_AUX_DIR([.])
 
