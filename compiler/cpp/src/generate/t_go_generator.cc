@@ -205,9 +205,9 @@ public:
 
     std::string go_autogen_comment();
     std::string go_package();
-    std::string go_imports_begin();
+    std::string go_imports_begin(bool include_error_package);
     std::string go_imports_end();
-    std::string render_includes();
+    std::string render_includes(bool include_error_package);
     std::string render_import_protection();
     std::string render_fastbinary_includes();
     std::string declare_argument(t_field* tfield);
@@ -504,13 +504,13 @@ void t_go_generator::init_generator()
     f_types_ <<
              go_autogen_comment() <<
              go_package() <<
-             render_includes() <<
+             render_includes(false) <<
              render_import_protection();
 
     f_consts_ <<
               go_autogen_comment() <<
               go_package() <<
-              render_includes();
+              render_includes(false);
 
     f_const_values_ << endl << "func init() {" << endl;
 
@@ -519,7 +519,7 @@ void t_go_generator::init_generator()
 /**
  * Renders all the imports necessary for including another Thrift program
  */
-string t_go_generator::render_includes()
+string t_go_generator::render_includes(bool include_error_package)
 {
     const vector<t_program*>& includes = program_->get_includes();
     string result = "";
@@ -544,7 +544,7 @@ string t_go_generator::render_includes()
         result += "\n";
     }
 
-    return go_imports_begin() + result + go_imports_end() + unused_prot;
+    return go_imports_begin(include_error_package) + result + go_imports_end() + unused_prot;
 }
 
 string t_go_generator::render_import_protection() {
@@ -581,13 +581,19 @@ string t_go_generator::go_package()
 /**
  * Render the beginning of the import statement
  */
-string t_go_generator::go_imports_begin()
+string t_go_generator::go_imports_begin(bool include_error_package)
 {
-    return
+    string to_return = 
         string("import (\n"
                "\t\"fmt\"\n"
                "\t\"math\"\n"
                "\t\"" + gen_thrift_import_ + "\"\n");
+
+    if(include_error_package) {
+        to_return += "\tgoerr \"github.com/bugsnag/bugsnag-go/errors\"\n";
+    }
+
+    return to_return;
 }
 
 /**
@@ -1385,7 +1391,7 @@ void t_go_generator::generate_service(t_service* tservice)
     f_service_ <<
                go_autogen_comment() <<
                go_package() <<
-               render_includes();
+               render_includes(true);
 
     generate_service_interface(tservice);
     generate_service_client(tservice);
@@ -2345,14 +2351,7 @@ void t_go_generator::generate_process_function(t_service* tservice,
         f_service_ << indent() << "if r := recover(); r != nil {" << endl;
         {
             Indent _(this);
-            f_service_ << indent() << "err, ok := r.(error)" << endl;
-            f_service_ << indent() << "if !ok {" << endl;
-            {
-                Indent _(this);
-                f_service_ << indent() << "err = fmt.Errorf(\"%v\", r)" << endl;
-            }
-            f_service_ << indent() << "}" << endl;
-            f_service_ << indent() << "callbackError = err" << endl;
+            f_service_ << indent() << "callbackError = goerr.New(r, 0)" << endl;
         }
         f_service_ << indent() << "}" << endl;
     }
