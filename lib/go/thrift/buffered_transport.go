@@ -75,14 +75,24 @@ func (p *TBufferedTransport) Read(buf []byte) (n int, err error) {
 	return n, nil
 }
 
+// Cherry-picked https://github.com/apache/thrift/commit/a5960383273432d5249c113f6413bbe39c13df50#diff-a29526d9f70f0716dfdb8c0afbc62a30
 func (p *TBufferedTransport) Write(buf []byte) (n int, err error) {
 	wbuf := p.wbuf
-	size := len(buf)
-	if wbuf.pos+size > wbuf.limit { // buffer is full, flush buffer
-		p.Flush()
+	remaining := len(buf)
+
+	for remaining > 0 {
+		if wbuf.pos+remaining > wbuf.limit { // buffer is full, flush buffer
+			if err := p.Flush(); err != nil {
+				return n, err
+			}
+		}
+		copied := copy(wbuf.buffer[wbuf.pos:], buf[n:])
+
+		wbuf.pos += copied
+		n += copied
+		remaining -= copied
 	}
-	n = copy(wbuf.buffer[wbuf.pos:], buf)
-	wbuf.pos += n
+
 	return n, nil
 }
 
