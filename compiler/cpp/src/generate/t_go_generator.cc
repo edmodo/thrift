@@ -1474,10 +1474,14 @@ void t_go_generator::generate_service_interface(t_service* tservice)
     }
 
     f_service_ <<
-               indent() << "type " << interfaceName << " interface {" << extends_if;
+               indent() << "type " << interfaceName << " interface {";
     indent_up();
     generate_go_docstring(f_service_, tservice);
-    vector<t_function*> functions = tservice->get_functions();
+    vector<t_function*> functions;
+
+    if (tservice->get_extends())
+        functions = tservice->get_extends()->get_functions();
+    functions.insert(functions.end(), tservice->get_functions().begin(), tservice->get_functions().end());
 
     if (!functions.empty()) {
         f_service_ << endl;
